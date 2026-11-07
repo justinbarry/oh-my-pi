@@ -10,7 +10,7 @@ import type { Api, Model } from "@oh-my-pi/pi-ai";
 import type { ModelRegistry } from "../../config/model-registry";
 import { getModelMatchPreferences, resolveModelRoleValue } from "../../config/model-resolver";
 import type { Settings } from "../../config/settings";
-import type { ExtensionModelQuery } from "./types";
+import type { ExtensionModelQuery, ExtensionModelSelection } from "./types";
 
 /**
  * Build the `ctx.models` facade. `getModel` is read lazily so `current()` always
@@ -21,18 +21,23 @@ export function createExtensionModelQuery(
 	settings: Settings | undefined,
 	getModel: () => Model | undefined,
 ): ExtensionModelQuery {
+	// resolveModelRoleValue expands a role alias (`@slow`) to its full configured
+	// priority list and tries each pattern — the same path core selection uses — so a
+	// fallback model lower in the list still resolves. Plain model strings pass through
+	// as a single pattern.
+	const resolveRole = (spec: string) =>
+		resolveModelRoleValue(spec, modelRegistry.getAvailable(), {
+			settings,
+			matchPreferences: getModelMatchPreferences(settings),
+		});
 	return {
 		list: () => modelRegistry.getAvailable(),
 		current: () => getModel(),
-		// resolveModelRoleValue expands a role alias (`@slow`) to its full configured
-		// priority list and tries each pattern — the same path core selection uses — so a
-		// fallback model lower in the list still resolves. Plain model strings pass through
-		// as a single pattern.
-		resolve: (spec: string): Model<Api> | undefined =>
-			resolveModelRoleValue(spec, modelRegistry.getAvailable(), {
-				settings,
-				matchPreferences: getModelMatchPreferences(settings),
-			}).model,
+		resolve: (spec: string): Model<Api> | undefined => resolveRole(spec).model,
+		resolveSelection: (spec: string): ExtensionModelSelection | undefined => {
+			const { model, thinkingLevel } = resolveRole(spec);
+			return model ? { model, thinkingLevel } : undefined;
+		},
 		family: (model: Model<Api>): string =>
 			model.identity.class === "unknown" ? model.provider.toLowerCase() : model.identity.class,
 	};

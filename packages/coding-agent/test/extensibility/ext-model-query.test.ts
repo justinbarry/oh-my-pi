@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Api, Model } from "@oh-my-pi/pi-ai";
+import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -53,6 +53,39 @@ describe("createExtensionModelQuery", () => {
 		const settings = Settings.isolated({ modelRoles: { slow: "anthropic/claude-opus-4-8" } });
 		const q = createExtensionModelQuery(registry(), settings, () => undefined);
 		expect(q.resolve("@slow")).toBe(claude);
+	});
+
+	test("resolveSelection() keeps the thinking level a role configures, which resolve() drops", () => {
+		const settings = Settings.isolated({ modelRoles: { slow: "anthropic/claude-opus-4-8:high" } });
+		const q = createExtensionModelQuery(registry(), settings, () => undefined);
+		expect(q.resolveSelection("@slow")).toEqual({ model: claude, thinkingLevel: Effort.High });
+		expect(q.resolveSelection("gpt-5.4")).toEqual({ model: gpt, thinkingLevel: undefined });
+		expect(q.resolveSelection("definitely-not-a-model")).toBeUndefined();
+	});
+
+	test("resolveSelection() takes the level from the role pattern that matched", () => {
+		// The first pattern names an unavailable model, so its level must not leak onto the fallback.
+		const settings = Settings.isolated({
+			modelRoles: { slow: "openai/missing-model:xhigh, anthropic/claude-opus-4-8:medium" },
+		});
+		const q = createExtensionModelQuery(registry(), settings, () => undefined);
+		expect(q.resolveSelection("@slow")).toEqual({ model: claude, thinkingLevel: Effort.Medium });
+	});
+
+	test("resolveSelection() lets an explicit suffix override the role's level", () => {
+		const settings = Settings.isolated({ modelRoles: { slow: "anthropic/claude-opus-4-8:high" } });
+		const q = createExtensionModelQuery(registry(), settings, () => undefined);
+		expect(q.resolveSelection("@slow:low")).toEqual({ model: claude, thinkingLevel: Effort.Low });
+	});
+
+	test("resolveSelection() treats a model id that ends in a level as the id, not a level", () => {
+		const router = model("local-router:low", "Local Router", "local");
+		const q = createExtensionModelQuery(
+			{ getAvailable: () => [router, gpt] } as unknown as ModelRegistry,
+			undefined,
+			() => undefined,
+		);
+		expect(q.resolveSelection("local/local-router:low")).toEqual({ model: router, thinkingLevel: undefined });
 	});
 
 	test("family() groups a vendor's point releases and separates vendors", () => {

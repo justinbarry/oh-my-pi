@@ -478,6 +478,7 @@ If you use raw `setInterval`/`setTimeout` or detached promises instead, you own 
 - `list()` — authenticated models available this session.
 - `current()` — the live session model (read lazily, so it reflects `/model` switches).
 - `resolve(spec)` — a model string (`provider/id`, bare id) or role alias (`@slow`, a configured role) → `Model`, honoring the same settings-backed aliases and match preferences as `--model`. Returns `undefined` when nothing matches.
+- `resolveSelection(spec)` — like `resolve`, but returns `{ model, thinkingLevel }`: the level from an explicit suffix (`gpt-5.4:high`) or from the role pattern that matched (`modelRoles.slow: "…:high"`), so an extension can request the effort a user configured on a role. `thinkingLevel` is `undefined` when neither sets one.
 - `family(model)` — an opaque lineage token for "same family?" checks (Claude point releases share a token; Claude and GPT differ). Compare it; don't persist it (the vocabulary tracks new releases).
 
 ```ts

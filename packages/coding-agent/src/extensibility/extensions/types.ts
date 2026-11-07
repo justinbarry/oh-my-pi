@@ -527,6 +527,13 @@ export interface CompactOptions {
 // surface (model registry, system prompt, shutdown, full session manager
 // access). Field overlap is incidental; merging into a base would require
 // hooks to widen their public contract.
+/** A model plus the thinking level its selector asked for; see {@link ExtensionModelQuery.resolveSelection}. */
+export interface ExtensionModelSelection {
+	model: Model;
+	/** From an explicit suffix (`gpt-5.4:high`) or the matched role pattern (`modelRoles.slow: "…:high"`); undefined when neither sets one. */
+	thinkingLevel?: ConfiguredThinkingLevel;
+}
+
 /**
  * Read-only model query facade exposed at `ctx.models`. Lets an extension select a
  * model the same way core does — list authenticated models, read the session model,
@@ -545,6 +552,13 @@ export interface ExtensionModelQuery {
 	 * to the base model (pass effort separately). Returns undefined when nothing matches.
 	 */
 	resolve(spec: string): Model | undefined;
+	/**
+	 * Like {@link resolve}, but keeps the thinking level the selector carries: an
+	 * explicit suffix or the level configured on the role pattern that matched. Model
+	 * ids that literally end in a suffix resolve with no level. Returns undefined when
+	 * nothing matches.
+	 */
+	resolveSelection(spec: string): ExtensionModelSelection | undefined;
 	/**
 	 * Opaque lineage token for "are these the same family?" comparisons — every Claude
 	 * point release shares a token, Claude and GPT differ. Backed by catalog canonical
